@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "404MusicDownloader": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
