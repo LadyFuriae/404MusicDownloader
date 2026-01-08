@@ -9,9 +9,6 @@ namespace _404MusicDownloader
 {
     public class App
     {
-        public void Run(DownloadManager Manager)
-        {   
-            Manager.StartListener(); 
-        }
+
     }
 }

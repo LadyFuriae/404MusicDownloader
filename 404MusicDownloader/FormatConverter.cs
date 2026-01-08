@@ -13,38 +13,43 @@ namespace _404MusicDownloader
     {
         private void SetArgs(string Path) 
         {
-            SetMP3Path(Path);
             args = $"-i \"{Path}\" -codec:a libmp3lame -q:a 2 \"{MP3Finalpath}\"";
             FFMPEGEXECUTEINFO = new ProcessStartInfo
             {
                 FileName = FFMPEGPATH,
                 Arguments = args,
                 UseShellExecute = false,
-                CreateNoWindow = false,
+                CreateNoWindow = true,
                 RedirectStandardOutput = true
             };
         }
 
-        private void SetMP3Path(string Path) 
+        private void SetMP3Path(string Path, string Container) 
         {
-            MP3Finalpath = Path.Replace("webm", "mp3");
+            string full = "." + Container;
+            MP3Finalpath = Path.Replace(full, ".mp3");
         }
 
-        public void ProcessAudio(string Path) 
-        {
-            
-            SetArgs(Path);
+        public void ProcessAudio(string Path, string Container)
+        { 
             lock (_lock)
             {
-                Process FFMPEGPROCESS = Process.Start(FFMPEGEXECUTEINFO);
+                DownloadManager.SongsDownloading.Dequeue();
+                SetMP3Path(Path, Container);
+                if (File.Exists(MP3Finalpath)) { File.Delete(MP3Finalpath); } 
+                SetArgs(Path);
+                FFMPEGPROCESS = Process.Start(FFMPEGEXECUTEINFO);
                 FFMPEGPROCESS.WaitForExit();
+                FFMPEGPROCESS.Dispose();
+                FFMPEGPROCESS = null;
                 File.Delete(Path);
             }
         }
         private Object _lock = new Object();
+        public static Process FFMPEGPROCESS;
         string args;
-        string MP3Finalpath;
+        public static string MP3Finalpath;
         ProcessStartInfo FFMPEGEXECUTEINFO;
-        const string FFMPEGPATH = @"C:\Users\LadyFuriae\source\repos\404MusicDownloader\404MusicDownloader\bin\Debug\net48\ffmpeg.exe";
+        const string FFMPEGPATH = @"ffmpeg\ffmpeg.exe";
     }
 }
