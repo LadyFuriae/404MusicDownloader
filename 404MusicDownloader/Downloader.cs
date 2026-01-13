@@ -11,6 +11,7 @@ using YoutubeExplode.Exceptions;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 using System.Text.Json;
+using YoutubeExplode.Playlists;
 
 #pragma warning disable CS4014
 
@@ -19,15 +20,30 @@ namespace _404MusicDownloader
 
     public struct VideoResult
     {
-        public VideoData Video;
-        public string Message;
 
-        public VideoResult(VideoData instance) 
+        public VideoResult(VideoData instance)
         {
             Video = instance;
-            Message = String.Empty;   
+            Message = String.Empty;
         }
+        
+        public VideoData Video;
+        public string Message;
     };
+
+    public struct PlayListResult
+    {
+
+        public void PrepareList() 
+        {
+            Videos = new List<PlaylistVideo>();
+            PreparedVideos = new List<VideoResult>();
+        }
+
+        public List<PlaylistVideo> Videos;
+        public List<VideoResult> PreparedVideos;
+        public string Message;
+    }
 
     public class PathSerialize
     {
@@ -41,44 +57,103 @@ namespace _404MusicDownloader
             GetLastPath();
         }
 
-        public async Task<VideoResult> SearchVideo(string URL) 
+        public bool IsFromPlayList(string URL) 
         {
-            
-            VideoData VideoData = new VideoData();
-            VideoResult Video = new VideoResult(VideoData);
 
-            Debug.WriteLine("Buscando esa vaina");
+            PlaylistId? PlayList = PlaylistId.TryParse(URL);
+            if( PlayList == null )
+                return false;
+            return true;
+        }
+
+        public async Task<PlayListResult> SearchPlayList(string URL) 
+        {
+
+            IAsyncEnumerator<PlaylistVideo> Enum = null;
+            PlayListResult Result = new PlayListResult();
+            Result.PrepareList();
+
             try
             {
-                Video.Video.Song = await Client.Videos.GetAsync(URL);
-                Debug.WriteLine("Se encontró");
-                Video.Video.Manifest = await Client.Videos.Streams.GetManifestAsync(URL);
-                Video.Video.GetInfo();
-                Video.Video.FormatSongName();
-                Debug.WriteLine("Video encolado");
+                Debug.WriteLine("Buscando...");
+                Enum = Client.Playlists.GetVideosAsync(URL).GetAsyncEnumerator();
+                while (await Enum.MoveNextAsync())
+                {
+                    Debug.WriteLine("Video obtenido");
+                    PlaylistVideo ListVideo = Enum.Current;
+                    Result.Videos.Add(ListVideo);
+                    Debug.WriteLine("Video agregado");
+                }
             }
-            catch (VideoUnavailableException e) 
+            catch (PlaylistUnavailableException e)
             {
-                Video.Video = null;  
-                Video.Message = MSG_VIDEO_NOT_AVAILABLE + e.Message;
+                Result.Videos = null;
+                Result.Message = MSG_PLAYLIST_NOT_AVAILABLE + e.Message;
             }
-            catch(VideoRequiresPurchaseException e) 
+            catch (Exception e) 
             {
-                 Video.Video = null;
-                 Video.Message = MSG_VIDEO_REQUIRES_PURCHASE;
+                Result.Videos = null;
+                Result.Message = MSG_GENERIC_ERROR + e.Message;
             }
-            catch(FormatException e) 
+
+            return Result;     
+        }
+
+        public async Task SearchPlayListStreams(PlayListResult Results) 
+        {
+            foreach (var Song in Results.Videos) 
             {
-                 Video.Video = null;
-                 Video.Message = MSG_VIDEO_URL_FORMAT_NOT_VALID;
+                VideoData SongData = new VideoData();
+                VideoResult SongFromPlayList = new VideoResult(SongData);
+                SongFromPlayList.Video.FormatSongName(Song.Title);
+                SongFromPlayList.Video.URL = Song.Url;
+                await SearchStreams(SongFromPlayList);
+                Results.PreparedVideos.Add(SongFromPlayList);
             }
-            catch(Exception e) 
+        }
+
+        public async Task<VideoResult> GetMetaData(string URL) 
+        {
+            VideoData SongData = new VideoData();
+            VideoResult Song = new VideoResult(SongData);
+            try
             {
-                 Video.Video = null;
-                 Video.Message = MSG_GENERIC_ERROR + e.Message;
+                Video video  = await Client.Videos.GetAsync(URL);
+                Song.Video.FormatSongName(video.Title);
+                Song.Video.URL = URL;
             }
-          
-            return Video; 
+            catch (VideoUnavailableException e)
+            {
+                Song.Video = null;
+                Song.Message = MSG_VIDEO_NOT_AVAILABLE + e.Message;
+            }
+            catch (VideoRequiresPurchaseException e)
+            {
+                Song.Video = null;
+                Song.Message = MSG_VIDEO_REQUIRES_PURCHASE;
+            }
+            catch (FormatException e)
+            {
+                Song.Video = null;
+                Song.Message = MSG_VIDEO_URL_FORMAT_NOT_VALID;
+            }
+            catch (Exception e)
+            {
+                Song.Video = null;
+                Song.Message = MSG_GENERIC_ERROR + e.Message;
+            }
+
+            return Song;
+        }
+
+        public async Task SearchStreams(VideoResult Song) 
+        {
+            Debug.WriteLine("Buscando esa vaina");
+
+            Debug.WriteLine("Se encontró");
+            Song.Video.Manifest = await Client.Videos.Streams.GetManifestAsync(Song.Video.URL);
+            Song.Video.GetInfo();
+            Debug.WriteLine("Song encolado");
         }
 
         public void GetLastPath()
@@ -106,7 +181,9 @@ namespace _404MusicDownloader
             CancellationToken CancelToken = TokenSource.Token;
             try
             {
+
                 await Client.Videos.Streams.DownloadAsync(Song.Info, Song.FinalPath, null, CancelToken);
+
             }
             catch (OperationCanceledException) 
             {
@@ -127,20 +204,11 @@ namespace _404MusicDownloader
             await Download(Song);
         }
 
-        public void ConvertSong(VideoData Song) 
+        public void ConvertSong(VideoData Song, string Format) 
         {
-            //Thread ConversionTask = new Thread(() => 
-            //
-            //{
-            //    
-            //
-            //});
-            //
-            //ConversionTask.Start();
-            //ConversionTask.Join();
 
             FormatConverter Converter = new FormatConverter();
-            Converter.ProcessAudio(Song.FinalPath, Song.Container);
+            Converter.ProcessAudio(Song.FinalPath, Song.Container, Format);
 
         }
 
@@ -152,32 +220,16 @@ namespace _404MusicDownloader
             }
         }
 
-        //public void RunPipeline()
-        //{
-        //    Task.Run(async () =>
-        //    {
-        //        while (VideoQueue.Count > 0)
-        //        {                   
-        //            
-        //            Debug.Write("DESCARGADO\n");
-        //            FormatConverter Converter = new FormatConverter();
-        //            Debug.Write("SE VA A CONVERTIR\n");
-        //            Converter.ProcessAudio(FinalPath);
-        //            Debug.Write("CONVERTIDO\n");
-        //            VIDEO_QUEUED_COUNT--;
-        //        }
-        //    });
-        //}
-
-
         public YoutubeClient Client;
         public string FolderPath = @"";
         public short VIDEO_QUEUED_COUNT = 0;
         public static Queue<CancellationTokenSource> SongsDownloading = new Queue<CancellationTokenSource>();
+ 
 
         private const string MSG_VIDEO_NOT_AVAILABLE = "Video no disponible. Motivo: ";
         private const string MSG_VIDEO_REQUIRES_PURCHASE = "El vídeo es de pago.";
         private const string MSG_VIDEO_URL_FORMAT_NOT_VALID = "Url inválida.";
+        private const string MSG_PLAYLIST_NOT_AVAILABLE = "Playlist no disponible: ";
         private const string MSG_GENERIC_ERROR = "Error: ";
         private const string SAVED_JSON_PATH = "LastPath.json";
     }

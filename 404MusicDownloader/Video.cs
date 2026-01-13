@@ -5,32 +5,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using YoutubeExplode;
+using YoutubeExplode.Playlists;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
 
 namespace _404MusicDownloader
 {
-    enum VideoType 
-    {
-        ADAPTIVE,
-        PROGRESSIVE
-    }
     public class VideoData
     {
-        private void GetVideoType() 
-        {
-            
-        }
         public void GetInfo() 
         {
             Info = Manifest.GetAudioOnlyStreams().GetWithHighestBitrate();
             Container = Info.Container.ToString();
             SongSize = Info.Size.Bytes;
         }
-        public void FormatSongName()
+        public void FormatSongName(string Title)
         {
-            FormatedSongName = Song.Title;
+            FormatedSongName = Title;
             foreach (char InvalidChars in Path.GetInvalidFileNameChars())
             {
                 FormatedSongName = FormatedSongName.Replace(InvalidChars, '_');
@@ -46,9 +38,10 @@ namespace _404MusicDownloader
         public long SongSize;
         public string Container;
         public string FormatedSongName;
-        public Video Song;
+        public string URL;
         public StreamManifest Manifest;
         public IStreamInfo Info;
-
     }
+
+
 }

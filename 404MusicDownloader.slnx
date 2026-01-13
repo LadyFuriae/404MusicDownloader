@@ -2,6 +2,6 @@
   <Folder Name="/Elementos de la solución/">
     <File Path="404MusicDownloader/bin/Debug/net48/app.manifest" />
   </Folder>
-  <Project Path="404MusicDownloader/404MusicDownloader.csproj" />
-  <Project Path="404MusicDownloaderUI/404MusicDownloaderUI.csproj" Id="639ca924-b17b-496c-99ef-6d9289eb4a35" />
+  <Project Path="404MusicDownloader/BusinessLogic.csproj" />
+  <Project Path="404MusicDownloaderUI/404MusicDownloader.csproj" Id="639ca924-b17b-496c-99ef-6d9289eb4a35" />
 </Solution>
