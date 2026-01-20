@@ -41,6 +41,7 @@ namespace _404MusicDownloaderUI
             PlayListMessage.ShowAlways = true;
 
             PlayListMessage.SetToolTip(this.PlaylistCheckBox, MSG_TOOL_TIP_PLAYLIST);
+            NumberGenerator = new Random();
         }
 
         private void label1_Click(object sender, EventArgs e)
@@ -78,8 +79,6 @@ namespace _404MusicDownloaderUI
                 return;
             }
 
-            bool UpdateUI = true;
-
             if (PlaylistCheckBox.Checked && Manager.IsFromPlayList(Link.Text))
             {
                 Debug.WriteLine("Este vídeo es una playlist");
@@ -106,6 +105,14 @@ namespace _404MusicDownloaderUI
 
                 while (await Result.Enum.MoveNextAsync()) 
                 {
+                    REQUESTS++; 
+                    if (REQUESTS >= 50) 
+                    { 
+                        REQUESTS = 0;
+                        int delay = NumberGenerator.Next(5, 15);
+                        await Task.Delay(delay * 1000);
+                    }
+
                     PlaylistVideo Video = Result.SearchVideoFromPlayList();
                     ListViewItem item = new ListViewItem(Video.Title);
 
@@ -303,8 +310,11 @@ namespace _404MusicDownloaderUI
         private const string MSG_TOOL_TIP_PLAYLIST = "Al marcar esta opción, descargarás todos los videos de una playlist insertando el link de un vídeo perteneciente a esa playlist";
         private const string WINDOW_SEARCHING_VIDEO = "Buscando vídeo. Por favor espere";
         private const string WINDOW_SEARCHING_PLAYLIST = "Buscando Playlist... Por favor sea paciente";
+        private static short REQUESTS = 0;
 
         private SemaphoreSlim Semaphore = new SemaphoreSlim(8, 8);
+        Random NumberGenerator;
+
     }
 }
 
