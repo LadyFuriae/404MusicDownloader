@@ -106,7 +106,7 @@ namespace _404MusicDownloaderUI
                 while (await Result.Enum.MoveNextAsync()) 
                 {
                     REQUESTS++; 
-                    if (REQUESTS >= 50) 
+                    if (REQUESTS >= MAX_REQUESTS_UNTIL_TIMEOUT) 
                     { 
                         REQUESTS = 0;
                         int delay = NumberGenerator.Next(5, 15);
@@ -309,8 +309,9 @@ namespace _404MusicDownloaderUI
 
         private const string MSG_TOOL_TIP_PLAYLIST = "Al marcar esta opción, descargarás todos los videos de una playlist insertando el link de un vídeo perteneciente a esa playlist";
         private const string WINDOW_SEARCHING_VIDEO = "Buscando vídeo. Por favor espere";
-        private const string WINDOW_SEARCHING_PLAYLIST = "Buscando Playlist... Por favor sea paciente";
+        private const string WINDOW_SEARCHING_PLAYLIST = "Buscando Playlist... Por favor espere";
         private static short REQUESTS = 0;
+        private static short MAX_REQUESTS_UNTIL_TIMEOUT = 20;
 
         private SemaphoreSlim Semaphore = new SemaphoreSlim(8, 8);
         Random NumberGenerator;
