@@ -3,22 +3,35 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Management.Instrumentation;
+using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using YoutubeExplode;
 using YoutubeExplode.Converter;
 using YoutubeExplode.Exceptions;
+using YoutubeExplode.Playlists;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
-using System.Text.Json;
-using YoutubeExplode.Playlists;
 
 #pragma warning disable CS4014
 
 namespace _404MusicDownloader
 {
 
-    public struct VideoResult
+    public struct Messages 
+    {
+        public const string MSG_VIDEO_NOT_AVAILABLE = "Video no disponible. Motivo: ";
+        public const string MSG_VIDEO_REQUIRES_PURCHASE = "El vídeo es de pago.";
+        public const string MSG_VIDEO_URL_FORMAT_NOT_VALID = "Url inválida.";
+        public const string MSG_VIDEO_IS_RESTRICTED = "Video con restricción de edad, privado o no disponible en tu país";
+        public const string MSG_PLAYLIST_NOT_AVAILABLE = "Playlist no disponible: ";
+        public const string MSG_GENERIC_ERROR = "Error: ";
+        public const string MSG_CONNECTION_ERROR = "Error de conexión.";
+        public const string SAVED_JSON_PATH = "LastPath.json";
+    }
+
+    public class VideoResult
     {
 
         public VideoResult(VideoData instance)
@@ -31,17 +44,35 @@ namespace _404MusicDownloader
         public string Message;
     };
 
-    public struct PlayListResult
+    public class PlayListResult
     {
 
-        public void PrepareList() 
+        public void CheckPlaylist(string URL, YoutubeClient Client) 
         {
-            Videos = new List<PlaylistVideo>();
-            PreparedVideos = new List<VideoResult>();
+            try
+            {
+                Enum = Client.Playlists.GetVideosAsync(URL).GetAsyncEnumerator();
+            }
+            catch (PlaylistUnavailableException e)
+            {
+                Message = Messages.MSG_PLAYLIST_NOT_AVAILABLE + e.Message;
+            }
+            catch (Exception e)
+            {
+                Message = Messages.MSG_GENERIC_ERROR + e.Message;
+            }
         }
 
-        public List<PlaylistVideo> Videos;
-        public List<VideoResult> PreparedVideos;
+        public PlaylistVideo SearchVideoFromPlayList()
+        {
+            Debug.WriteLine("Buscando...");
+            PlaylistVideo ListVideo = Enum.Current;
+            Debug.WriteLine("Video obtenido");
+            Debug.WriteLine("Video agregado");
+            return ListVideo;
+        }
+
+        public IAsyncEnumerator<PlaylistVideo> Enum;
         public string Message;
     }
 
@@ -66,54 +97,19 @@ namespace _404MusicDownloader
             return true;
         }
 
-        public async Task<PlayListResult> SearchPlayList(string URL) 
+        public async Task<VideoResult> SearchPlaylistVideoStream(PlaylistVideo Video) 
         {
-
-            IAsyncEnumerator<PlaylistVideo> Enum = null;
-            PlayListResult Result = new PlayListResult();
-            Result.PrepareList();
-
-            try
-            {
-                Debug.WriteLine("Buscando...");
-                Enum = Client.Playlists.GetVideosAsync(URL).GetAsyncEnumerator();
-                while (await Enum.MoveNextAsync())
-                {
-                    Debug.WriteLine("Video obtenido");
-                    PlaylistVideo ListVideo = Enum.Current;
-                    Result.Videos.Add(ListVideo);
-                    Debug.WriteLine("Video agregado");
-                }
-            }
-            catch (PlaylistUnavailableException e)
-            {
-                Result.Videos = null;
-                Result.Message = MSG_PLAYLIST_NOT_AVAILABLE + e.Message;
-            }
-            catch (Exception e) 
-            {
-                Result.Videos = null;
-                Result.Message = MSG_GENERIC_ERROR + e.Message;
-            }
-
-            return Result;     
-        }
-
-        public async Task SearchPlayListStreams(PlayListResult Results) 
-        {
-            foreach (var Song in Results.Videos) 
-            {
-                VideoData SongData = new VideoData();
-                VideoResult SongFromPlayList = new VideoResult(SongData);
-                SongFromPlayList.Video.FormatSongName(Song.Title);
-                SongFromPlayList.Video.URL = Song.Url;
-                await SearchStreams(SongFromPlayList);
-                Results.PreparedVideos.Add(SongFromPlayList);
-            }
+           VideoData SongData = new VideoData();
+           VideoResult SongFromPlayList = new VideoResult(SongData);
+           SongFromPlayList.Video.FormatSongName(Video.Title);
+           SongFromPlayList.Video.URL = Video.Url;
+           await SearchStreams(SongFromPlayList);
+           return SongFromPlayList;
         }
 
         public async Task<VideoResult> GetMetaData(string URL) 
         {
+            Debug.WriteLine("Se va a buscar");
             VideoData SongData = new VideoData();
             VideoResult Song = new VideoResult(SongData);
             try
@@ -121,26 +117,28 @@ namespace _404MusicDownloader
                 Video video  = await Client.Videos.GetAsync(URL);
                 Song.Video.FormatSongName(video.Title);
                 Song.Video.URL = URL;
+                Debug.WriteLine("Se encontró");
+
             }
             catch (VideoUnavailableException e)
             {
                 Song.Video = null;
-                Song.Message = MSG_VIDEO_NOT_AVAILABLE + e.Message;
+                Song.Message = Messages.MSG_VIDEO_NOT_AVAILABLE + e.Message;
             }
             catch (VideoRequiresPurchaseException e)
             {
                 Song.Video = null;
-                Song.Message = MSG_VIDEO_REQUIRES_PURCHASE;
+                Song.Message = Messages.MSG_VIDEO_REQUIRES_PURCHASE;
             }
             catch (FormatException e)
             {
                 Song.Video = null;
-                Song.Message = MSG_VIDEO_URL_FORMAT_NOT_VALID;
+                Song.Message = Messages.MSG_VIDEO_URL_FORMAT_NOT_VALID;
             }
             catch (Exception e)
             {
                 Song.Video = null;
-                Song.Message = MSG_GENERIC_ERROR + e.Message;
+                Song.Message = Messages.MSG_GENERIC_ERROR + e.Message;
             }
 
             return Song;
@@ -149,16 +147,43 @@ namespace _404MusicDownloader
         public async Task SearchStreams(VideoResult Song) 
         {
             Debug.WriteLine("Buscando esa vaina");
-
-            Debug.WriteLine("Se encontró");
-            Song.Video.Manifest = await Client.Videos.Streams.GetManifestAsync(Song.Video.URL);
-            Song.Video.GetInfo();
-            Debug.WriteLine("Song encolado");
+            try
+            {
+                Debug.WriteLine("Se encontró");
+                Song.Video.Manifest = await Client.Videos.Streams.GetManifestAsync(Song.Video.URL);
+                Song.Video.GetInfo();
+                Debug.WriteLine("Song encolado");
+            }
+            catch (VideoUnavailableException ex)
+            {
+                Song.Video = null;
+                Song.Message = Messages.MSG_VIDEO_IS_RESTRICTED;
+            }
+            catch (VideoUnplayableException ex)
+            {
+                Song.Video = null;
+                Song.Message = Messages.MSG_VIDEO_NOT_AVAILABLE + ex.Message;
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("403"))
+            {
+                Song.Video = null;
+                Song.Message = Messages.MSG_GENERIC_ERROR + ex.Message;
+            }
+            catch (HttpRequestException ex)
+            {
+                Song.Video = null;
+                Song.Message = Messages.MSG_CONNECTION_ERROR + ex.Message;
+            }
+            catch (Exception ex)
+            {
+                Song.Video = null;
+                Song.Message = Messages.MSG_GENERIC_ERROR + ex.Message;
+            }
         }
 
         public void GetLastPath()
         {
-            string LastPath = File.ReadAllText(SAVED_JSON_PATH);
+            string LastPath = File.ReadAllText(Messages.SAVED_JSON_PATH);
         
             JsonDocument doc = JsonDocument.Parse(LastPath);
             JsonElement root = doc.RootElement;
@@ -168,10 +193,10 @@ namespace _404MusicDownloader
 
         public void ReplacePath(string Path) 
         {
-            var json = File.ReadAllText(SAVED_JSON_PATH);
+            var json = File.ReadAllText(Messages.SAVED_JSON_PATH);
             PathSerialize JsonPath = JsonSerializer.Deserialize<PathSerialize>(json);
             JsonPath.LastPath = Path;
-            File.WriteAllText(SAVED_JSON_PATH, JsonSerializer.Serialize(JsonPath, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(Messages.SAVED_JSON_PATH, JsonSerializer.Serialize(JsonPath, new JsonSerializerOptions { WriteIndented = true }));
         }
         public async Task Download(VideoData Song) 
         {
@@ -220,17 +245,19 @@ namespace _404MusicDownloader
             }
         }
 
+        public bool CheckIfValidURL(string URL)
+        {
+            if (VideoId.TryParse(URL) == null) 
+                return false; 
+            return true;
+        }
+
         public YoutubeClient Client;
         public string FolderPath = @"";
         public short VIDEO_QUEUED_COUNT = 0;
         public static Queue<CancellationTokenSource> SongsDownloading = new Queue<CancellationTokenSource>();
  
 
-        private const string MSG_VIDEO_NOT_AVAILABLE = "Video no disponible. Motivo: ";
-        private const string MSG_VIDEO_REQUIRES_PURCHASE = "El vídeo es de pago.";
-        private const string MSG_VIDEO_URL_FORMAT_NOT_VALID = "Url inválida.";
-        private const string MSG_PLAYLIST_NOT_AVAILABLE = "Playlist no disponible: ";
-        private const string MSG_GENERIC_ERROR = "Error: ";
-        private const string SAVED_JSON_PATH = "LastPath.json";
+
     }
 }

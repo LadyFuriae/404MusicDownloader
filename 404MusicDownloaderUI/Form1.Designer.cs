@@ -53,6 +53,8 @@
             this.Link.Name = "Link";
             this.Link.Size = new System.Drawing.Size(398, 26);
             this.Link.TabIndex = 0;
+            this.Link.Click += new System.EventHandler(this.Link_Click);
+            this.Link.TextChanged += new System.EventHandler(this.Link_TextChanged);
             // 
             // button1
             // 
@@ -83,12 +85,12 @@
             // SongName
             // 
             this.SongName.Text = "Nombre de canción";
-            this.SongName.Width = 461;
+            this.SongName.Width = 406;
             // 
             // ProgresStatus
             // 
             this.ProgresStatus.Text = "Estado: ";
-            this.ProgresStatus.Width = 155;
+            this.ProgresStatus.Width = 270;
             // 
             // button2
             // 

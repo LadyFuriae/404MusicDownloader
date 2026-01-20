@@ -13,25 +13,29 @@ namespace _404MusicDownloaderUI
 {
     public partial class AdvertiseMessage : Form
     {
-        public AdvertiseMessage(string text)
+        private AdvertiseMessage(string text)
         {
             InitializeComponent();
             this.label1.Text = text;
             this.label1.TextAlign = ContentAlignment.MiddleCenter;
         }
-        public void Open()
+        static public void Open(string text)
         {
-            _timer.Interval = PROCESSINGTIMEOUT;
-            _timer.Tick += (sender, e) =>
+            Task.Run(() =>
             {
-                _timer.Stop();
-                this.Close();
-            };
-            _timer.Start();
-            this.ShowDialog(); 
+                AdvertiseMessage msg = new AdvertiseMessage(text);
+                msg._timer.Interval = PROCESSINGTIMEOUT;
+                msg._timer.Tick += (sender, e) =>
+                {
+                    msg._timer.Stop();
+                    msg.Close();
+                };
+                msg._timer.Start();
+                msg.ShowDialog();
+            });
         }
-        private readonly System.Windows.Forms.Timer _timer = new System.Windows.Forms.Timer();
-        private const int PROCESSINGTIMEOUT = 3000;
+        public readonly System.Windows.Forms.Timer _timer = new System.Windows.Forms.Timer();
+        public const int PROCESSINGTIMEOUT = 4000;
 
         private void AdvertiseMessage_Load(object sender, EventArgs e)
         {
