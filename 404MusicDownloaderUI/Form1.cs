@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using YoutubeExplode.Playlists;
+using YoutubeExplode.Videos;
 using static System.Windows.Forms.LinkLabel;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
@@ -39,6 +40,9 @@ namespace _404MusicDownloaderUI
             PlayListMessage.InitialDelay = 50;  
             PlayListMessage.ReshowDelay = 100;   
             PlayListMessage.ShowAlways = true;
+            RetryDownloadsButton.Enabled = true;
+            CleanTasksButton.Enabled = true;
+
 
             PlayListMessage.SetToolTip(this.PlaylistCheckBox, MSG_TOOL_TIP_PLAYLIST);
             NumberGenerator = new Random();
@@ -74,28 +78,26 @@ namespace _404MusicDownloaderUI
 
             if (!Manager.CheckIfValidURL(Link.Text))
             {
-                Debug.WriteLine("No es un link de youtube");
                 MessageBox.Show("Link no válido. Por favor verifique la URL e inténtelo de nuevo");
                 return;
             }
 
             if (PlaylistCheckBox.Checked && Manager.IsFromPlayList(Link.Text))
             {
-                Debug.WriteLine("Este vídeo es una playlist");
-                ManagePlayList(Format);
+                AdvertiseMessage.Open(WINDOW_SEARCHING_PLAYLIST);
+                ManagePlayList(Format, Link.Text);
                 return;
             }
-
-            ManageSingleVideo(Format);
+            AdvertiseMessage.Open(WINDOW_SEARCHING_VIDEO);
+            ManageSingleVideo(Format, Link.Text);
         }
 
-        public async Task ManagePlayList(string Format) 
+        public async Task ManagePlayList(string Format, string URL) 
         {
             Task.Run(async () =>
             {
-                AdvertiseMessage.Open(WINDOW_SEARCHING_PLAYLIST);
                 PlayListResult Result = new PlayListResult();
-                Result.CheckPlaylist(Link.Text, Manager.Client); 
+                Result.CheckPlaylist(URL, Manager.Client); 
 
                 if (!string.IsNullOrEmpty(Result.Message))
                 {
@@ -117,60 +119,67 @@ namespace _404MusicDownloaderUI
                     ListViewItem item = new ListViewItem(Video.Title);
 
                     item.SubItems.Add(MSG_WAITING);
-                    DownloadQueue.BeginInvoke(new Action(() =>
+                    DownloadQueue.Invoke(new Action(() =>
                     {
                         DownloadQueue.Items.Add(item);
                     }));
 
                     Task.Run(async () => 
                     {
-                        Semaphore.Wait();
-                        VideoResult PreparedSong = await Manager.SearchPlaylistVideoStream(Video);
-                        
-                        if (!String.IsNullOrEmpty(PreparedSong.Message))
+                        try
                         {
-                            DownloadQueue.BeginInvoke(new Action(() => 
+                            await Semaphore.WaitAsync();
+                            VideoResult PreparedSong = await Manager.SearchPlaylistVideoStream(Video);
+
+                            if (PreparedSong == null)
                             {
-                                item.SubItems[UI_STATUS_INDEX].Text = PreparedSong.Message;
+                                DownloadQueue.BeginInvoke(new Action(() =>
+                                {
+                                    item.SubItems[UI_STATUS_INDEX].Text = PreparedSong.Message;
+                                }));
+                                FailedTasks.Add(URL);
+                                return;
+                            }
+
+                            DownloadQueue.Invoke(new Action(() =>
+                            {
+                                item.SubItems[UI_STATUS_INDEX].Text = MSG_DOWNLOADING;
                             }));
-                            return;
+                            await Manager.StartDownload(PreparedSong.Video);
+                            DownloadQueue.Invoke(new Action(() =>
+                            {
+                                item.SubItems[UI_STATUS_INDEX].Text = MSG_CONVERSION_PROGRESS + Format + "...";
+                            }));
+
+                            Manager.ConvertSong(PreparedSong.Video, Format);
+
+                            DownloadQueue.BeginInvoke(new Action(() => { item.SubItems[UI_STATUS_INDEX].Text = MSG_SUCCESS; }));
                         }
-
-                        DownloadQueue.Invoke(new Action(() =>
+                        finally 
                         {
-                            item.SubItems[UI_STATUS_INDEX].Text = MSG_DOWNLOADING;
-                        }));
-                        await Manager.StartDownload(PreparedSong.Video);
-                        DownloadQueue.Invoke(new Action(() =>
-                        {
-                            item.SubItems[UI_STATUS_INDEX].Text = MSG_CONVERSION_PROGRESS + Format + "...";
-                        }));
-
-                        Manager.ConvertSong(PreparedSong.Video, Format);
-
-                        DownloadQueue.BeginInvoke(new Action(() => { item.SubItems[UI_STATUS_INDEX].Text = MSG_SUCCESS; }));
-                        Semaphore.Release();
+                            FinishedTasks.Add(item);
+                            Semaphore.Release();
+                        }
                     });
+
                 }
             });
 
         }
-        private async Task ManageSingleVideo(string Format) 
+        private async Task ManageSingleVideo(string Format, string URL) 
         {
             Task.Run(async () =>
             {
+                VideoResult Song = await Manager.GetMetaData(URL);
 
-                AdvertiseMessage.Open(WINDOW_SEARCHING_VIDEO);
 
-                VideoResult Song = await Manager.GetMetaData(Link.Text);
-
-                if (!string.IsNullOrEmpty(Song.Message))
+                if (Song.Video == null)
                 {
-                    MessageBox.Show(Song.Message);
+                    MessageBox.Show($"No se ha podido encontrar el vídeo: {URL}. Motivo: {Song.Message}");
                     return;
                 }
 
-                ListViewItem item = new ListViewItem(Song.Video.FormatedSongName);
+                ListViewItem item = new ListViewItem(Song.Video.RawSongName);
 
                 item.SubItems.Add(MSG_WAITING);
 
@@ -179,32 +188,38 @@ namespace _404MusicDownloaderUI
                     DownloadQueue.Items.Add(item);
                 }));
 
-                Semaphore.Wait();
-
-                await Manager.SearchStreams(Song);
-                if (!String.IsNullOrEmpty(Song.Message))
+                try
                 {
+                    await Semaphore.WaitAsync();
+                    await Manager.SearchStreams(Song);
+
+                    if (Song.Video == null)
+                    {
+                        DownloadQueue.Invoke(new Action(() =>
+                        {
+                            item.SubItems[UI_STATUS_INDEX].Text = Song.Message;
+                        }));
+                        FailedTasks.Add(URL);
+                        return;
+                    }
+
+                    await Manager.StartDownload(Song.Video);
+
                     DownloadQueue.Invoke(new Action(() =>
                     {
-                        item.SubItems[UI_STATUS_INDEX].Text = Song.Message;
+                        Format = FormatComboBox.Text;
+                        item.SubItems[UI_STATUS_INDEX].Text = MSG_CONVERSION_PROGRESS + Format + "...";
                     }));
-                    return;
+
+                    Manager.ConvertSong(Song.Video, Format);
+                    DownloadQueue.BeginInvoke(new Action(() => { item.SubItems[UI_STATUS_INDEX].Text = MSG_SUCCESS; }));
                 }
-
-
-                await Manager.StartDownload(Song.Video);
-                Semaphore.Release();
-                DownloadQueue.Invoke(new Action(() =>
+                finally 
                 {
-                    Format = FormatComboBox.Text;
-                    item.SubItems[UI_STATUS_INDEX].Text = MSG_CONVERSION_PROGRESS + Format + "...";
-                }));
-
-                Manager.ConvertSong(Song.Video, Format);
-
-                DownloadQueue.BeginInvoke(new Action(() => { item.SubItems[UI_STATUS_INDEX].Text = MSG_SUCCESS; }));
+                    FinishedTasks.Add(item);
+                    Semaphore.Release();
+                }
             });
-
         }
 
         private void FillComboBox()
@@ -230,6 +245,27 @@ namespace _404MusicDownloaderUI
 
         }
 
+
+        private void RetryDownloadsButton_Click(object sender, EventArgs e)
+        {
+            RetryDownloadsButton.Enabled = false;
+            try
+            {
+                if (FailedTasks.Count < 1)
+                {
+                    MessageBox.Show("No hay descargas fallidas");
+                    return;
+                }
+
+                string Format = FormatComboBox.Text;
+                AdvertiseMessage.Open(MSG_RETRYING_DOWNLOADS);
+                foreach (var URL in FailedTasks)
+                {
+                    ManageSingleVideo(Format, URL);
+                }
+            }
+            finally {RetryDownloadsButton.Enabled = true;}
+        }
         private void button2_Click(object sender, EventArgs e)
         {
             FolderBrowserDialog FileExplorer = new FolderBrowserDialog();
@@ -258,6 +294,37 @@ namespace _404MusicDownloaderUI
             }
         }
 
+        private void Link_Click(object sender, EventArgs e)
+        {
+            Link.SelectAll();
+        }
+
+        private void CleanTasksButton_Click(object sender, EventArgs e)
+        {
+
+            CleanTasksButton.Enabled = false;
+            try
+            {
+                if (FinishedTasks.Count < 1)
+                {
+                    MessageBox.Show("No hay tareas finalizadas");
+                    return;
+                }
+
+
+                foreach (ListViewItem Item in FinishedTasks)
+                {
+                    DownloadQueue.Invoke(new Action(() =>
+                    {
+                        DownloadQueue.Items.Remove(Item);
+                    }));
+                }
+
+                FinishedTasks.Clear();
+            }
+            finally { CleanTasksButton.Enabled = true; }
+            
+        }
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
 
@@ -296,13 +363,11 @@ namespace _404MusicDownloaderUI
 
         }
 
-        private void Link_Click(object sender, EventArgs e)
-        {
-            Link.SelectAll();
-        }
+
         private const short  UI_STATUS_INDEX = 1;
         private const string MSG_SEARCHING = "Buscando vídeo...";
         private const string MSG_DOWNLOADING = "Descargando...";
+        private const string MSG_RETRYING_DOWNLOADS = "Reintentando descarga(s)...";
         private const string MSG_WAITING = "Esperando...";
         private const string MSG_CONVERSION_PROGRESS = "Convirtiendo a ";
         private const string MSG_SUCCESS = "¡Completado!";
@@ -312,6 +377,9 @@ namespace _404MusicDownloaderUI
         private const string WINDOW_SEARCHING_PLAYLIST = "Buscando Playlist... Por favor espere";
         private static short REQUESTS = 0;
         private static short MAX_REQUESTS_UNTIL_TIMEOUT = 20;
+
+        private List<ListViewItem> FinishedTasks = new List<ListViewItem>();
+        private List<string> FailedTasks = new List<string>();
 
         private SemaphoreSlim Semaphore = new SemaphoreSlim(8, 8);
         Random NumberGenerator;

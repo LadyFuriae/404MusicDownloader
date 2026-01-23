@@ -1,4 +1,7 @@
-﻿namespace _404MusicDownloaderUI
+﻿using System.Drawing;
+using System.Windows.Forms;
+
+namespace _404MusicDownloaderUI
 {
     partial class AdvertiseMessage
     {
@@ -34,13 +37,14 @@
             // 
             // label1
             // 
-            this.label1.AutoSize = true;
-            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(53, 75);
-            this.label1.MaximumSize = new System.Drawing.Size(300, 0);
+            this.label1.Cursor = System.Windows.Forms.Cursors.No;
+            this.label1.Font = new System.Drawing.Font("Franklin Gothic Medium", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(12, 9);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(0, 29);
+            this.label1.Size = new System.Drawing.Size(383, 186);
             this.label1.TabIndex = 0;
+            this.label1.Text = "label1";
+            this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // AdvertiseMessage
             // 
@@ -57,7 +61,6 @@
             this.Text = "Mensaje";
             this.Load += new System.EventHandler(this.AdvertiseMessage_Load);
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 

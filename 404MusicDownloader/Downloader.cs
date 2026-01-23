@@ -117,6 +117,7 @@ namespace _404MusicDownloader
                 Video video  = await Client.Videos.GetAsync(URL);
                 Song.Video.FormatSongName(video.Title);
                 Song.Video.URL = URL;
+                Song.Video.RawSongName = video.Title;
                 Debug.WriteLine("Se encontró");
 
             }

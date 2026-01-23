@@ -44,6 +44,8 @@
             this.FormatComboBox = new System.Windows.Forms.ComboBox();
             this.PlaylistCheckBox = new System.Windows.Forms.CheckBox();
             this.ToolTipPlaylist = new System.Windows.Forms.ToolTip(this.components);
+            this.CleanTasksButton = new System.Windows.Forms.Button();
+            this.RetryDownloadsButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // Link
@@ -180,11 +182,33 @@
             // 
             this.ToolTipPlaylist.ToolTipTitle = "Pene";
             // 
+            // CleanTasksButton
+            // 
+            this.CleanTasksButton.Location = new System.Drawing.Point(515, 212);
+            this.CleanTasksButton.Name = "CleanTasksButton";
+            this.CleanTasksButton.Size = new System.Drawing.Size(119, 23);
+            this.CleanTasksButton.TabIndex = 15;
+            this.CleanTasksButton.Text = "Limpiar descargas";
+            this.CleanTasksButton.UseVisualStyleBackColor = true;
+            this.CleanTasksButton.Click += new System.EventHandler(this.CleanTasksButton_Click);
+            // 
+            // RetryDownloadsButton
+            // 
+            this.RetryDownloadsButton.Location = new System.Drawing.Point(12, 212);
+            this.RetryDownloadsButton.Name = "RetryDownloadsButton";
+            this.RetryDownloadsButton.Size = new System.Drawing.Size(119, 23);
+            this.RetryDownloadsButton.TabIndex = 16;
+            this.RetryDownloadsButton.Text = "Reintentar descargas";
+            this.RetryDownloadsButton.UseVisualStyleBackColor = true;
+            this.RetryDownloadsButton.Click += new System.EventHandler(this.RetryDownloadsButton_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(646, 560);
+            this.Controls.Add(this.RetryDownloadsButton);
+            this.Controls.Add(this.CleanTasksButton);
             this.Controls.Add(this.PlaylistCheckBox);
             this.Controls.Add(this.FormatComboBox);
             this.Controls.Add(this.Format);
@@ -226,6 +250,8 @@
         private System.Windows.Forms.ComboBox FormatComboBox;
         private System.Windows.Forms.CheckBox PlaylistCheckBox;
         private System.Windows.Forms.ToolTip ToolTipPlaylist;
+        private System.Windows.Forms.Button CleanTasksButton;
+        private System.Windows.Forms.Button RetryDownloadsButton;
     }
 }
 

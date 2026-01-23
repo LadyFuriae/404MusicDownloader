@@ -17,7 +17,6 @@ namespace _404MusicDownloaderUI
         {
             InitializeComponent();
             this.label1.Text = text;
-            this.label1.TextAlign = ContentAlignment.MiddleCenter;
         }
         static public void Open(string text)
         {

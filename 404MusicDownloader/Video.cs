@@ -38,6 +38,7 @@ namespace _404MusicDownloader
         public long SongSize;
         public string Container;
         public string FormatedSongName;
+        public string RawSongName;
         public string URL;
         public StreamManifest Manifest;
         public IStreamInfo Info;
