@@ -61,6 +61,7 @@ namespace _404MusicDownloaderUI
             this.Text = "Mensaje";
             this.Load += new System.EventHandler(this.AdvertiseMessage_Load);
             this.ResumeLayout(false);
+            this.TopMost = true;
 
         }
 

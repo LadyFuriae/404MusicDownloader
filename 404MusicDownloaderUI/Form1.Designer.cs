@@ -184,11 +184,11 @@
             // 
             // CleanTasksButton
             // 
-            this.CleanTasksButton.Location = new System.Drawing.Point(515, 212);
+            this.CleanTasksButton.Location = new System.Drawing.Point(498, 212);
             this.CleanTasksButton.Name = "CleanTasksButton";
-            this.CleanTasksButton.Size = new System.Drawing.Size(119, 23);
+            this.CleanTasksButton.Size = new System.Drawing.Size(136, 23);
             this.CleanTasksButton.TabIndex = 15;
-            this.CleanTasksButton.Text = "Limpiar descargas";
+            this.CleanTasksButton.Text = "Limpiar tareas culminadas";
             this.CleanTasksButton.UseVisualStyleBackColor = true;
             this.CleanTasksButton.Click += new System.EventHandler(this.CleanTasksButton_Click);
             // 

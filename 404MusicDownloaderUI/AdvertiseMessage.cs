@@ -17,6 +17,7 @@ namespace _404MusicDownloaderUI
         {
             InitializeComponent();
             this.label1.Text = text;
+
         }
         static public void Open(string text)
         {

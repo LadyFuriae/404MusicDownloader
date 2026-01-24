@@ -107,14 +107,15 @@ namespace _404MusicDownloaderUI
 
                 while (await Result.Enum.MoveNextAsync()) 
                 {
-                    REQUESTS++; 
-                    if (REQUESTS >= MAX_REQUESTS_UNTIL_TIMEOUT) 
-                    { 
+
+                    REQUESTS++;
+                    if (REQUESTS >= MAX_REQUESTS_UNTIL_TIMEOUT)
+                    {
                         REQUESTS = 0;
                         int delay = NumberGenerator.Next(5, 15);
                         await Task.Delay(delay * 1000);
                     }
-
+                    
                     PlaylistVideo Video = Result.SearchVideoFromPlayList();
                     ListViewItem item = new ListViewItem(Video.Title);
 
@@ -131,13 +132,16 @@ namespace _404MusicDownloaderUI
                             await Semaphore.WaitAsync();
                             VideoResult PreparedSong = await Manager.SearchPlaylistVideoStream(Video);
 
-                            if (PreparedSong == null)
+                            if (!String.IsNullOrEmpty(PreparedSong.Message))
                             {
                                 DownloadQueue.BeginInvoke(new Action(() =>
                                 {
                                     item.SubItems[UI_STATUS_INDEX].Text = PreparedSong.Message;
                                 }));
-                                FailedTasks.Add(URL);
+                                lock (_lock)
+                                {
+                                    FailedTasks.Add(PreparedSong.Video.URL);
+                                }
                                 return;
                             }
 
@@ -145,6 +149,7 @@ namespace _404MusicDownloaderUI
                             {
                                 item.SubItems[UI_STATUS_INDEX].Text = MSG_DOWNLOADING;
                             }));
+                            
                             await Manager.StartDownload(PreparedSong.Video);
                             DownloadQueue.Invoke(new Action(() =>
                             {
@@ -157,7 +162,10 @@ namespace _404MusicDownloaderUI
                         }
                         finally 
                         {
-                            FinishedTasks.Add(item);
+                            lock (_lock)
+                            {
+                                FinishedTasks.Add(item);
+                            }
                             Semaphore.Release();
                         }
                     });
@@ -170,12 +178,23 @@ namespace _404MusicDownloaderUI
         {
             Task.Run(async () =>
             {
+                REQUESTS++;
+                if (REQUESTS >= MAX_REQUESTS_UNTIL_TIMEOUT)
+                {
+                    REQUESTS = 0;
+                    int delay = NumberGenerator.Next(5, 15);
+                    await Task.Delay(delay * 1000);
+                }
+
                 VideoResult Song = await Manager.GetMetaData(URL);
 
-
-                if (Song.Video == null)
+                if (!String.IsNullOrEmpty(Song.Message))
                 {
                     MessageBox.Show($"No se ha podido encontrar el vídeo: {URL}. Motivo: {Song.Message}");
+                    lock (_lock) 
+                    {
+                        FailedTasks.Add(URL);
+                    }
                     return;
                 }
 
@@ -193,13 +212,16 @@ namespace _404MusicDownloaderUI
                     await Semaphore.WaitAsync();
                     await Manager.SearchStreams(Song);
 
-                    if (Song.Video == null)
+                    if (!String.IsNullOrEmpty(Song.Message))
                     {
                         DownloadQueue.Invoke(new Action(() =>
                         {
                             item.SubItems[UI_STATUS_INDEX].Text = Song.Message;
                         }));
-                        FailedTasks.Add(URL);
+                        lock (_lock)
+                        {
+                            FailedTasks.Add(URL);
+                        }
                         return;
                     }
 
@@ -216,7 +238,10 @@ namespace _404MusicDownloaderUI
                 }
                 finally 
                 {
-                    FinishedTasks.Add(item);
+                    lock (_lock)
+                    {
+                        FinishedTasks.Add(item);
+                    }
                     Semaphore.Release();
                 }
             });
@@ -253,18 +278,24 @@ namespace _404MusicDownloaderUI
             {
                 if (FailedTasks.Count < 1)
                 {
+
                     MessageBox.Show("No hay descargas fallidas");
                     return;
                 }
-
                 string Format = FormatComboBox.Text;
+
                 AdvertiseMessage.Open(MSG_RETRYING_DOWNLOADS);
+
                 foreach (var URL in FailedTasks)
                 {
                     ManageSingleVideo(Format, URL);
                 }
             }
-            finally {RetryDownloadsButton.Enabled = true;}
+            finally 
+            {
+                FailedTasks.Clear();
+                RetryDownloadsButton.Enabled = true;
+            }
         }
         private void button2_Click(object sender, EventArgs e)
         {
@@ -310,7 +341,6 @@ namespace _404MusicDownloaderUI
                     MessageBox.Show("No hay tareas finalizadas");
                     return;
                 }
-
 
                 foreach (ListViewItem Item in FinishedTasks)
                 {
@@ -376,7 +406,9 @@ namespace _404MusicDownloaderUI
         private const string WINDOW_SEARCHING_VIDEO = "Buscando vídeo. Por favor espere";
         private const string WINDOW_SEARCHING_PLAYLIST = "Buscando Playlist... Por favor espere";
         private static short REQUESTS = 0;
-        private static short MAX_REQUESTS_UNTIL_TIMEOUT = 20;
+        private static short MAX_REQUESTS_UNTIL_TIMEOUT = 30;
+
+        private readonly Object _lock = new Object();
 
         private List<ListViewItem> FinishedTasks = new List<ListViewItem>();
         private List<string> FailedTasks = new List<string>();

@@ -115,6 +115,11 @@ namespace _404MusicDownloader
             try
             {
                 Video video  = await Client.Videos.GetAsync(URL);
+                if (video == null) 
+                {
+                    Song.Message = "No se han podido obtener los datos.";
+                    return Song;
+                }
                 Song.Video.FormatSongName(video.Title);
                 Song.Video.URL = URL;
                 Song.Video.RawSongName = video.Title;
@@ -123,22 +128,18 @@ namespace _404MusicDownloader
             }
             catch (VideoUnavailableException e)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_VIDEO_NOT_AVAILABLE + e.Message;
             }
             catch (VideoRequiresPurchaseException e)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_VIDEO_REQUIRES_PURCHASE;
             }
             catch (FormatException e)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_VIDEO_URL_FORMAT_NOT_VALID;
             }
             catch (Exception e)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_GENERIC_ERROR + e.Message;
             }
 
@@ -157,27 +158,22 @@ namespace _404MusicDownloader
             }
             catch (VideoUnavailableException ex)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_VIDEO_IS_RESTRICTED;
             }
             catch (VideoUnplayableException ex)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_VIDEO_NOT_AVAILABLE + ex.Message;
             }
             catch (HttpRequestException ex) when (ex.Message.Contains("403"))
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_GENERIC_ERROR + ex.Message;
             }
             catch (HttpRequestException ex)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_CONNECTION_ERROR + ex.Message;
             }
             catch (Exception ex)
             {
-                Song.Video = null;
                 Song.Message = Messages.MSG_GENERIC_ERROR + ex.Message;
             }
         }
